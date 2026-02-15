@@ -1,0 +1,1949 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Cliente Toilet - 2026.02.03</title>
+    <link rel="manifest" href="manifest.json" />
+
+    <!-- <meta name="theme-color" content="#2196f3" /> -->
+    
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+       
+        html {
+            overflow-x: hidden;
+            max-width: 100vw;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f5f5f5; 
+            color: #333;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            max-width: 100vw;
+            width: 100%;
+        }
+
+        .container {
+            width: calc(100% - 40px);
+            max-width: 350px;
+            aspect-ratio: 3 / 4;
+            min-height: 85vh;
+            margin: 30px 20px;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            display: flex; /* Visibile di default (muletto) */
+            flex-direction: column;
+        }
+        
+        .container {
+          max-width: 360px;
+          margin: 0 auto;
+        }
+
+        #calendar-container {
+          max-width: 320px;
+          margin: 0 auto;
+        }
+
+        .calendar-grid {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 6px;
+        }
+        
+        @supports not (aspect-ratio: 3 / 4) {
+            .container::before {
+                content: "";
+                float: left;
+                padding-top: 133.33%;
+            }
+            .container::after {
+                content: "";
+                display: block;
+                clear: both;
+            }
+        }
+        
+        .container * {
+            max-width: 100%;
+        }
+
+        .update-banner {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(90deg, #2196f3, #ffeb3b);
+            color: #000;
+            padding: 10px 12px;
+            box-sizing: border-box;
+            z-index: 4000;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-weight: 600;
+        }
+
+        .update-banner button {
+            background: #000;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .vet-card {
+            background: white;
+            padding: 45px 15px;
+            margin-bottom: 16px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .vet-card h2 {
+            margin: 0;
+            font-size: 1.6em;
+        }
+        
+        .vet-card p {
+            margin: 5px 0 0;
+            font-size: 0.9em;
+        }
+        
+        @media (max-width: 600px) {
+            .vet-card {
+                padding: 45px 15px;
+                margin-bottom: 8px;
+            }
+            
+            .vet-card h2 {
+                font-size: 0.85em;
+            }
+            
+            .vet-card p {
+                font-size: 0.7em;
+            }
+        }
+        
+        .my-appointments {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 4px 8px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 1cm;
+            box-sizing: border-box;
+        }
+        
+        .my-appointments.visible {
+            display: flex;
+        }
+        
+        .appointment-nav {
+            background: none;
+            border: none;
+            font-size: 1em;
+            cursor: pointer;
+            padding: 2px 6px;
+            color: #333;
+        }
+        
+        .appointment-info {
+            flex-grow: 1;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.85em;
+        }
+        
+        .appointment-delete {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+
+        .month-selector {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 0px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            background: white;
+            border: 1px solid #ddd;
+        }
+
+        .custom-info-bar { 
+            width: 100%;
+            padding: 7px 12px;
+            background: #2196f3; 
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.95em;
+            text-align: center;
+            margin-top: 12px;
+            margin-bottom: 8px;
+        }
+
+        
+        @media (max-width: 600px) {
+            .month-selector {
+                margin-bottom: 15px;
+                padding: 0px 10px;
+            }
+            
+            .custom-info-bar {
+                margin-bottom: 8px;
+                padding: 6px 10px;
+                font-size: 0.75em;
+            }
+        }
+
+        .control-button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 4px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+
+        .custom-info-bar .control-button {
+            background: #f57c00;
+        }
+        
+        #calendar-wrapper {
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .day-grid {
+            display: grid;
+            grid-template-columns: repeat(16, 60px);
+            grid-template-rows: repeat(2, 60px);
+            grid-auto-flow: row;
+            gap: 6px;
+            width: max-content;
+        }
+        
+        .day-box {
+            padding: 10px 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+            touch-action: manipulation; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: #ffeb3b; 
+            border: 1px solid black; /* Ripristino del bordo nero sottile */
+            color: #1b5e20;
+            font-weight: bold;
+            font-size: 1.6em; 
+            height: 50px;
+            width: 60px;
+        }
+        
+        @media (max-width: 768px) {
+            #calendar-wrapper {
+                padding-bottom: 14px;
+                overflow-y: visible;
+            }
+
+            .day-grid {
+                grid-template-rows: repeat(2, 44px);
+                row-gap: 2px;
+            }
+
+            .day-box {
+                height: 42px;
+                width: 42px;
+                font-size: 1.2em;
+                padding: 6px 3px;
+            }
+            
+            .day-grid {
+                grid-template-columns: repeat(15, 42px);
+                gap: 3px;
+                width: 645px;
+            }
+        }
+
+        .day-box:hover {
+            background: #81c784; 
+        }
+        
+        .day-box.selected {
+            background: #2ecc71 !important; 
+            color: white !important;
+        }
+
+        .day-box.disabled {
+            background: #f0f0f0;
+            color: #ccc;
+            cursor: default;
+        }
+        
+        .modal {
+            position: fixed; 
+            top: 0;
+            left: 0;
+            width: 100%; 
+            height: 100%; 
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none; 
+            justify-content: center;
+            align-items: flex-start; 
+            z-index: 1000;
+            overflow: auto; 
+            padding-top: 20px; 
+            box-sizing: border-box; 
+        }
+
+        #iosHelpModal {
+            z-index: 4001;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 90%;
+            width: 350px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            margin: 0 auto 20px auto; 
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .ios-help-content {
+            text-align: left;
+            position: relative;
+        }
+
+        .ios-help-close {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: none;
+            border: none;
+            font-size: 1.1em;
+            cursor: pointer;
+        }
+
+        .modal-content button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin-top: 15px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        /* Modale messaggi */
+        #message-modal .message-modal-content {
+            width: 500px;
+            max-width: 95%;
+            min-height: auto;
+            padding: 24px;
+            text-align: left;
+        }
+
+        #message-modal h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .message-form-group {
+            margin-bottom: 15px;
+        }
+
+        .message-form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .message-form-group input,
+        .message-form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+
+        .message-form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .message-error {
+            color: #c0392b;
+            margin-bottom: 10px;
+            display: none;
+            text-align: center;
+        }
+
+        .message-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-start;
+            margin-top: 20px;
+        }
+
+        .message-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .message-btn.send {
+            background: #2ecc71;
+            color: white;
+        }
+
+        .message-btn.cancel {
+            background: #bdc3c7;
+            color: #2c3e50;
+        }
+
+        #availableSlotsList {
+            max-height: 250px; 
+            overflow-y: auto; 
+            padding-right: 10px; 
+            -webkit-overflow-scrolling: touch; 
+            overscroll-behavior-y: contain;
+            max-width: 100%;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .slot-time {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #e1f5fe;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        
+        .slot-time.occupied {
+            background: #e0e0e0;
+            color: #999;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+        
+        .slot-time:not(.occupied):hover {
+            background: #b3e5fc;
+        }
+
+        #bookingForm input, #bookingForm textarea {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        #logoPlaceholder {
+            width: calc(100% - 20px);
+            height: 70px; /* circa due input sovrapposti */
+            margin: 6px 0 10px 0;
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            background: #f9f9f9;
+            padding: 8px;
+            overflow: auto;
+            font-size: 0.95em;
+            color: #333;
+            text-align: left;
+        }
+        
+        #bookingForm button {
+            width: 100%;
+            margin-top: 0;
+            background: #2ecc71;
+            font-size: 1.1em;
+            padding: 12px 20px;
+        }
+
+        #custom-alert {
+            position: fixed;
+            top: 50px; 
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50; 
+            color: white;
+            padding: 15px 45px 15px 25px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.5s, transform 0.5s;
+            pointer-events: none; 
+            max-width: 90%;
+            width: auto;
+            min-width: 280px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.95em;
+            line-height: 1.4;
+        }
+
+        #custom-alert.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+        
+        #custom-alert.error {
+            background: #e74c3c;
+        }
+        
+        
+        #welcome-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        #welcome-modal.show {
+            display: flex;
+        }
+        
+        .welcome-content {
+            background: white;
+            border-radius: 10px;
+            padding: 30px 25px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+        
+        .welcome-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #666;
+            cursor: pointer;
+            font-weight: bold;
+            line-height: 1;
+        }
+        
+        .welcome-close:hover {
+            color: #333;
+        }
+        
+        .welcome-content h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .welcome-content p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 12px;
+            font-size: 0.95em;
+        }
+        
+        .welcome-button {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .welcome-button:hover {
+            background: #229954;
+        }
+        
+        .help-button {
+            display: none;
+        }
+        
+        .help-instructions-button {
+            width: 100%;
+            padding: 12px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            font-size: 0.95em;
+        }
+
+        
+        .help-instructions-button:hover {
+            background: #1976d2;
+        }
+
+        .ios-help-button {
+            width: 100%;
+            padding: 12px;
+            background: #0b3b70;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-weight: 700;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+
+        .ios-help-button:hover {
+            background: #0d4a8c;
+        }
+
+        .activation-code-button {
+            width: 100%;
+            padding: 8px;
+            background: #333333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        
+        .send-documents-button {
+            width: 100%;
+            padding: 8px;
+            background: #2196f3; /* Colore blu come richiesto */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+        
+        .help-instructions-button,
+        .send-documents-button,
+        .activation-code-button {
+            margin-top: 8px; /* Spazio tra i pulsanti (attenzione al modale) */
+            padding: 12px; /* Altezza uniforme */
+            font-size: 0.9em; /* Testo uniforme */
+            white-space: normal;
+            word-break: break-word;
+            box-sizing: border-box;
+        }
+        
+        .documents-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        .documents-modal.show {
+            display: flex;
+        }
+        
+        .documents-content {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .documents-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 28px;
+            color: #666;
+            cursor: pointer;
+            font-weight: bold;
+            line-height: 1;
+        }
+        
+        .documents-close:hover {
+            color: #333;
+        }
+        
+        .documents-content h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        /* TABS */
+        .tabs-container {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+        
+        .tab-button {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.95em;
+            color: #666;
+            transition: all 0.3s;
+        }
+        
+        .tab-button:hover {
+            color: #333;
+            background: #f5f5f5;
+        }
+        
+        .tab-button.active {
+            color: #4CAF50;
+            border-bottom-color: #4CAF50;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .categories-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .category-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .category-item:hover {
+            background: #e0e0e0;
+        }
+
+        .category-icon {
+            font-size: 1.5em;
+            margin-right: 12px;
+        }
+
+        .category-name {
+            flex: 1;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .category-count {
+            color: #999;
+            font-size: 0.9em;
+        }
+        
+        .category-view {
+            display: none;
+        }
+        
+        .category-view.active {
+            display: block;
+        }
+        
+        .category-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .back-button {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 5px 10px;
+            margin-right: 10px;
+            color: #666;
+        }
+        
+        .back-button:hover {
+            color: #333;
+        }
+        
+        .category-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .add-document-btn {
+            width: 100%;
+            padding: 12px;
+            background: #2196f3; /* Colore blu */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 20px;
+            font-size: 1em;
+        }
+        
+        .add-document-btn:hover {
+            background: #45a049;
+        }
+        
+        .documents-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        .upload-form {
+            display: none;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .upload-form.active {
+            display: block;
+        }
+        
+        .upload-form input[type="text"],
+        .upload-form textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        .upload-form-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .upload-form-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .btn-save {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .btn-cancel {
+            background: #999;
+            color: white;
+        }
+        
+        .document-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .document-item:hover {
+            background: #e8e8e8;
+        }
+        
+        .document-thumbnail {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-right: 12px;
+            background: #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+        }
+        
+        .document-info {
+            flex: 1;
+        }
+        
+        .document-name {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 3px;
+        }
+        
+        .document-date {
+            font-size: 0.85em;
+            color: #999;
+        }
+        
+        .document-viewer-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 4000;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        
+        .document-viewer-modal.show {
+            display: flex;
+        }
+        
+        .document-viewer-content {
+            background: white;
+            border-radius: 10px;
+            max-width: 90%;
+            max-height: 90%;
+            width: 600px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .document-viewer-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .document-viewer-title {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .document-viewer-close {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .document-viewer-body {
+            flex: 1;
+            overflow: auto;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .document-viewer-image {
+            max-width: 100%;
+            max-height: 60vh;
+            border-radius: 8px;
+        }
+        
+        .document-viewer-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .doc-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.95em;
+        }
+        
+        .doc-btn-send {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .doc-btn-delete {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .file-preview {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .file-preview img {
+            max-width: 80px;
+            max-height: 80px;
+            border-radius: 4px;
+        }
+        
+        .file-info {
+            flex: 1;
+            margin-left: 10px;
+        }
+        
+        .remove-file {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        
+        #documentsForm input[type="text"],
+        #documentsForm textarea {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+        #documentsForm button[type="submit"] {
+            width: 100%;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            margin-top: 10px;
+        }
+        
+        #documentsForm button[type="submit"]:hover {
+            background: #45a049;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            display: block;
+            padding: 12px;
+            background: #2196f3;
+            color: white;
+            text-align: center;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .file-input-label:hover {
+            background: #1976d2;
+        }
+
+        #alert-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        
+        #alert-close-btn:hover {
+            opacity: 0.7;
+        }
+        
+        
+        @media (max-aspect-ratio: 9/16) and (max-width: 768px) {
+            .container {
+                min-height: 85vh;
+                aspect-ratio: 3 / 4;
+            }
+        }
+
+        /* ===== MODAL ATTIVAZIONE BELLISSIMO ===== */
+        #activation-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            padding: 20px;
+            box-sizing: border-box;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        #activation-modal.show {
+            display: flex;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .activation-content {
+            background: white;
+            border-radius: 15px;
+            padding: 40px 30px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            animation: slideUp 0.4s ease;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .activation-content .icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+        
+        .activation-content h2 {
+            color: #6a1b9a;
+            margin: 0 0 10px;
+            font-size: 1.6em;
+        }
+        
+        .activation-content p {
+            color: #666;
+            margin-bottom: 25px;
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
+        
+        .activation-form input {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+            box-sizing: border-box;
+        }
+        
+        .activation-form input:focus {
+            outline: none;
+            border-color: #6a1b9a;
+        }
+        
+        .activation-form input.error {
+            border-color: #e74c3c;
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        
+        .activation-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .activation-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .activation-button:active {
+            transform: translateY(0);
+        }
+        
+        .activation-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.9em;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+        
+        .error-message.show {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+        
+        .attempts-info {
+            color: #f39c12;
+            font-size: 0.85em;
+            margin-top: 10px;
+        }
+
+        
+        /* POPUP CONFERMA BELLINO */
+        .confirm-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 5000;
+            animation: fadeIn 0.2s ease;
+        }
+        
+        .confirm-modal.show {
+            display: flex;
+        }
+        
+        .confirm-content {
+            background: white;
+            border-radius: 12px;
+            padding: 30px 25px;
+            max-width: 90%;
+            width: 350px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            animation: slideUp 0.3s ease;
+        }
+        
+        .confirm-icon {
+            font-size: 50px;
+            margin-bottom: 15px;
+        }
+        
+        .confirm-message {
+            font-size: 1.1em;
+            color: #333;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+        
+        .confirm-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .confirm-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1em;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .confirm-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .confirm-btn-cancel {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .confirm-btn-yes {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .confirm-btn-delete {
+            background: #e74c3c;
+            color: white;
+        }
+    
+/* === FIX #infoModal layout (identico a campione) === */
+#infoModal.modal{
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  display: none;
+  justify-content: center;
+  align-items: flex-start;
+  z-index: 1000;
+  overflow: auto;
+  padding-top: 20px;
+  box-sizing: border-box;
+}
+#infoModal .modal-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 90%;
+    width: 350px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    text-align: center;
+    margin: 0 auto 20px auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-height: 600px;
+    max-height: 400px;
+    overflow-y: scroll;
+}
+#infoModal .modal-content button{
+  background: #3498db;
+  color: #fff;
+  border: none;
+  padding: 15px;
+  margin-top: 20px;
+  border-radius: 8px;
+  width: 100%;
+  cursor: pointer;
+
+  /* evita affiancamenti */
+  display: block;
+  flex: 0 0 auto;
+}
+#infoModal .modal-content button.btn-green{
+  background: #2ecc71;
+}
+#infoModal input[type="checkbox"]:checked + span{
+  color:#27ae60;
+  font-weight:700;
+}
+#privacyAccept:checked {
+  accent-color: #27ae60;
+  background-color: #27ae60;
+}
+/* Scrollbar sempre visibile */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+    </style>
+<!-- Push gestite solo via VAPID (SDK push terzi rimosso) -->
+</head>
+<body>
+    <div id="update-banner" class="update-banner">
+        <span>Nuova versione disponibile! L'app si aggiornerà tra 5 minuti. Clicca per aggiornare subito.</span>
+        <button id="update-reload-btn">AGGIORNA ORA</button>
+    </div>
+<script>
+// Polyfill minimi per compatibilità (fetch, Promise già presente su Chrome 50+, metodi stringa)
+// fetch polyfill semplice
+if (typeof window.fetch !== 'function') {
+    window.fetch = function(url, options) {
+        return new Promise(function(resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.open((options && options.method) || 'GET', url, true);
+            if (options && options.headers) {
+                for (var h in options.headers) {
+                    xhr.setRequestHeader(h, options.headers[h]);
+                }
+            }
+            xhr.onload = function() {
+                var response = {
+                    ok: (xhr.status >= 200 && xhr.status < 300),
+                    status: xhr.status,
+                    statusText: xhr.statusText,
+                    url: xhr.responseURL,
+                    text: function() { return Promise.resolve(xhr.responseText); },
+                    json: function() { try { return Promise.resolve(JSON.parse(xhr.responseText)); } catch (e) { return Promise.reject(e); } }
+                };
+                resolve(response);
+            };
+            xhr.onerror = function() { reject(new TypeError('Network request failed')); };
+            xhr.send(options && options.body ? options.body : null);
+        });
+    };
+}
+// Promise polyfill molto semplice
+if (typeof Promise !== 'function') {
+    (function () {
+        function Promise(fn) {
+            var state = 'pending';
+            var value;
+            var deferred = [];
+            function handle(handler) {
+                if (state === 'pending') {
+                    deferred.push(handler);
+                    return;
+                }
+                if (state === 'fulfilled' && typeof handler.onFulfilled === 'function') {
+                    handler.onFulfilled(value);
+                }
+                if (state === 'rejected' && typeof handler.onRejected === 'function') {
+                    handler.onRejected(value);
+                }
+            }
+            function resolve(newValue) {
+                try {
+                    if (newValue && typeof newValue.then === 'function') {
+                        newValue.then(resolve, reject);
+                        return;
+                    }
+                    state = 'fulfilled';
+                    value = newValue;
+                    deferred.forEach(handle);
+                } catch (e) {
+                    reject(e);
+                }
+            }
+            function reject(reason) {
+                state = 'rejected';
+                value = reason;
+                deferred.forEach(handle);
+            }
+            this.then = function (onFulfilled, onRejected) {
+                return new Promise(function (resolveNext, rejectNext) {
+                    handle({
+                        onFulfilled: function (val) {
+                            if (typeof onFulfilled === 'function') {
+                                try {
+                                    resolveNext(onFulfilled(val));
+                                } catch (e) {
+                                    rejectNext(e);
+                                }
+                            } else {
+                                resolveNext(val);
+                            }
+                        },
+                        onRejected: function (err) {
+                            if (typeof onRejected === 'function') {
+                                try {
+                                    resolveNext(onRejected(err));
+                                } catch (e) {
+                                    rejectNext(e);
+                                }
+                            } else {
+                                rejectNext(err);
+                            }
+                        }
+                    });
+                });
+            };
+            fn(resolve, reject);
+        }
+        Promise.resolve = function (val) { return new Promise(function (res) { res(val); }); };
+        Promise.reject = function (err) { return new Promise(function (res, rej) { rej(err); }); };
+        Promise.all = function (arr) {
+            return new Promise(function (resolve, reject) {
+                var remaining = arr.length;
+                var results = [];
+                if (remaining === 0) { resolve(results); return; }
+                function resolver(i) {
+                    return function (val) {
+                        results[i] = val;
+                        remaining -= 1;
+                        if (remaining === 0) resolve(results);
+                    };
+                }
+                for (var i = 0; i < arr.length; i++) {
+                    arr[i].then(resolver(i), reject);
+                }
+            });
+        };
+        window.Promise = Promise;
+    })();
+}
+// String polyfill
+if (!String.prototype.repeat) {
+    String.prototype.repeat = function(count) {
+        count = Math.floor(count);
+        if (count < 0) throw new RangeError('repeat count must be non-negative');
+        if (count === Infinity) throw new RangeError('repeat count must be less than infinity');
+        var str = String(this);
+        var result = '';
+        for (var i = 0; i < count; i++) result += str;
+        return result;
+    };
+}
+if (!String.prototype.startsWith) {
+    String.prototype.startsWith = function(search, pos) {
+        pos = pos || 0;
+        return this.substring(pos, pos + search.length) === search;
+    };
+}
+if (!String.prototype.includes) {
+    String.prototype.includes = function(search, start) {
+        if (search instanceof RegExp) throw TypeError('first argument must not be a RegExp');
+        if (start === undefined) start = 0;
+        return this.indexOf(search, start) !== -1;
+    };
+}
+if (!String.prototype.padStart) {
+    String.prototype.padStart = function padStart(targetLength, padString) {
+        targetLength = targetLength >> 0;
+        padString = String(padString || ' ');
+        if (this.length >= targetLength) return String(this);
+        targetLength = targetLength - this.length;
+        if (targetLength > padString.length) {
+            padString += padString.repeat(Math.ceil(targetLength / padString.length));
+        }
+        return padString.slice(0, targetLength) + String(this);
+    };
+}
+// AUTO-UPDATE: Controllo versione (PRIMA DI TUTTO)
+
+// Blocca solo iOS aperto in browser in-app (no Android, no Safari nativo)
+(function () {
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isInApp = ua.includes('whatsapp') || ua.includes('instagram') || ua.includes('fb') || ua.includes('telegram');
+
+    if (isIOS && isInApp) {
+        document.body.innerHTML = `
+          <div style="padding:20px;text-align:center;font-family:sans-serif">
+            <h2>⚠️ Apri in Safari</h2>
+            <p>Per installare l’app e ricevere notifiche,<br>apri questo link in <b>Safari</b>.</p>
+            <p>Tocca <b>⋯</b> → <b>Apri nel browser</b></p>
+          </div>
+        `;
+    }
+})();
+</script>
+
+
+
+   <!-- POPUP CONFERMA BELLINO -->
+    <div id="confirm-modal" class="confirm-modal">
+        <div class="confirm-content">
+            <div class="confirm-icon" id="confirm-icon">❓</div>
+            <div class="confirm-message" id="confirm-message">Sei sicuro?</div>
+            <div class="confirm-buttons">
+                <button class="confirm-btn confirm-btn-cancel" id="confirm-cancel">Annulla</button>
+                <button class="confirm-btn confirm-btn-yes" id="confirm-yes">Conferma</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ATTIVAZIONE BELLISSIMO -->
+    <div id="activation-modal" onclick="preventCloseIfNoCode(event)">
+        <div class="activation-content">
+            <div class="icon">🔐</div>
+            <h2>Attiva la tua App</h2>
+            <div id="activation-install-warning" style="display:none;"></div>
+            <p style="display:none">Inserisci il codice di attivazione e il tuo numero di telefono per iniziare</p>
+            
+            <form class="activation-form" onsubmit="event.preventDefault(); attivaApp()">
+                <input 
+                    type="text" 
+                    id="activation-code-input" 
+                    placeholder="Codice di attivazione" 
+                    required
+                    autocomplete="off"
+                >
+                <input 
+                    type="tel" 
+                    id="activation-phone-input" 
+                    placeholder="Numero di telefono" 
+                    required
+                    autocomplete="tel"
+                >
+                <div class="error-message" id="activation-error"></div>
+                <div class="attempts-info" id="attempts-info"></div>
+                <button type="submit" class="activation-button" id="activation-btn">
+                    Attiva Applicazione
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="vet-card">
+            <div style="position: relative; padding: 5px;">
+                <span style="position: absolute; top: 0; left: 10px; font-size: 1.2em;">🐕‍🦺</span>
+                <span style="position: absolute; bottom: 0; right: 10px; font-size: 1.2em;">🐩</span>
+                <div style="text-align: center;">
+                    <div style="font-size: 1.8em; font-weight: bold; color: #2c3e50; margin-bottom: 2px;">DOG STYLE</div>
+                    <div style="font-size: 1.1em; color: #34495e;">Prenotazione Toilettatura</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="month-selector">
+            <button class="control-button" onclick="changeMonth(-1)">&lt;</button>
+            <span id="current-month-year"></span>
+            <button class="control-button" onclick="changeMonth(1)">&gt;</button>
+        </div>
+
+        <div id="calendar-wrapper">
+            <div class="day-grid" id="calendar-container"></div>
+        </div>
+        
+
+   
+        
+        <button class="help-instructions-button" onclick="openInfoModal()">ISTRUZIONI UTILIZZO</button>
+        <div style="display:flex; gap:10px; width:100%; margin-top: 8px;">
+            <button style="flex:1; background:#000; color:#fff; border:none; padding:12px; border-radius:5px; cursor:pointer;">CHIUDI</button>
+            <button id="btnPromo" style="flex:1; background:#ffeb3b; color:#000; border:none; padding:12px; border-radius:5px; cursor:pointer;">PROMO</button>
+        </div>
+        <button class="send-documents-button" id="btnRegistrati" onclick="startVapidRegistration()">REGISTRATI QUI</button>
+        <button class="send-documents-button" id="btnInviaMessagio" style="background: #000;" onclick="openMessageModal()">INVIA MESSAGIO</button>
+    </div>
+
+    <!-- Modale invio messaggio -->
+    <div id="message-modal" class="modal" onclick="closeMessageModal(event)">
+        <div class="modal-content message-modal-content" onclick="event.stopPropagation()">
+            <h3>Scrivi il tuo messaggio</h3>
+            <div class="message-error" id="message-error">Compila tutti i campi</div>
+            <div class="message-form-group">
+                <label for="message-name">Nome</label>
+                <input type="text" id="message-name" placeholder="Il tuo nome" required>
+            </div>
+            <div class="message-form-group">
+                <label for="message-phone">Telefono</label>
+                <input type="tel" id="message-phone" placeholder="Il tuo telefono" required>
+            </div>
+            <div class="message-form-group">
+                <label for="message-text">Messaggio</label>
+                <textarea id="message-text" placeholder="Scrivi qui il tuo messaggio..." rows="4" required></textarea>
+            </div>
+            <div class="message-buttons">
+                <button class="message-btn send" onclick="submitMessage(event)">INVIA</button>
+                <button class="message-btn cancel" onclick="closeMessageModal()">ANNULLA</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modale Impostazioni / Installazione / Privacy -->
+    <div id="infoModal" class="modal" onclick="closeInfoModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h3>PRIMA DI PROSEGUIRE DEVI LEGGERE E ACCETTARE LA PRIVACY</h3>
+            <div style="text-align:left">
+                <label style="display:flex; align-items:flex-start; gap:8px;">
+                    <input id="privacyAccept" type="checkbox" onchange="onPrivacyChange(event)" style="width:20px; height:20px; margin-right:8px; cursor:pointer;" />
+                    <span>Ho letto e accetto la <a href="#" onclick="openPrivacy(event)">Privacy</a></span>
+                </label>
+            </div>
+            <button id="instructionsBtn" onclick="openWelcomeFromInfo()">Apri istruzioni</button>
+            <button id="installBtn" onclick="handleInstallClick()" disabled>Installa applicazione di comunicazione</button>
+            <button id="activationBtn" onclick="openActivationModalFromPopup()">Inserisci codice di attivazione</button>
+            <button id="btnRegistrati2" class="send-documents-button" onclick="document.getElementById('btnRegistrati').click()">REGISTRATI QUI</button>
+            <button id="installVoiceBtn" class="btn-green" onclick="handleInstallVoiceClick()" disabled>INSTALLA AGENDA VOCALE GRATIS</button>
+            <button id="closeInfo" onclick="closeInfoModal(event)">Chiudi</button>
+        </div>
+    </div>
+
+    <!-- Modale Privacy -->
+    <div id="privacyModal" class="modal" onclick="closePrivacyModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-height:80vh; overflow-y:auto;">
+            <h3>Privacy Policy</h3>
+            <div style="text-align:left; padding:15px 0; line-height:1.6;">
+                <p><strong>Informativa Privacy</strong></p>
+                <p>I tuoi dati personali vengono trattati nel rispetto della normativa sulla privacy (GDPR).</p>
+                <p><strong>Dati raccolti:</strong></p>
+                <ul>
+                    <li>Nome e cognome</li>
+                    <li>Numero di telefono</li>
+                    <li>Informazioni relative agli appuntamenti</li>
+                </ul>
+                <p><strong>Finalità del trattamento:</strong></p>
+                <ul>
+                    <li>Gestione prenotazioni appuntamenti toilettatura</li>
+                    <li>Comunicazioni relative agli appuntamenti</li>
+                    <li>Invio notifiche di promemoria</li>
+                </ul>
+                <p><strong>Conservazione dati:</strong> I dati vengono conservati per il tempo necessario alle finalità indicate.</p>
+                <p><strong>Diritti dell'interessato:</strong> Hai diritto di accesso, rettifica, cancellazione dei dati, opporti al trattamento, e portabilità dei dati.</p>
+                <p><strong>Contatti:</strong> Per esercitare i tuoi diritti, contatta il toilettatore.</p>
+            </div>
+            <button onclick="acceptPrivacy()" style="width:100%; padding:15px; background:#2ecc71; color:white; border:none; border-radius:5px; font-size:1.1em; cursor:pointer; margin-top:15px;">
+                Accetto
+            </button>
+            <button onclick="closePrivacyModal(event)" style="width:100%; padding:10px; margin-top:10px; background:#ccc; border:none; border-radius:5px; cursor:pointer;">
+                Chiudi
+            </button>
+        </div>
+    </div>
+
+    <div id="slotModal" class="modal" onclick="closeSlotModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <h3 id="modalTitle"></h3>
+            
+            <div id="modalContainer">
+                <div id="availableSlotsList"></div>
+
+                <form id="bookingForm" onsubmit="event.preventDefault(); addAppointment()">
+                    <div id="fixedTimeInfo"></div>
+                    <div id="logoPlaceholder" contenteditable="true" aria-label="Spazio logo o testo personalizzato"></div>
+
+                    <input type="text" id="inputNomeCompleto" placeholder="Nome e Cognome" required>
+                    <input type="text" id="inputTelefono" placeholder="Telefono" required>
+
+                    <textarea id="inputProblematica" placeholder="" rows="3" required></textarea>
+                    
+                    <input type="hidden" id="selectedDateTime">
+
+                    <button type="submit">Invia Prenotazione</button>
+                </form>
+            </div>
+            
+            <button id="closeButton" onclick="closeSlotModal()">Chiudi</button>
+        </div>
+    </div>
+
+    <div id="custom-alert">
+        <button id="alert-close-btn" onclick="closeAlert()">×</button>
+        <span id="alert-message"></span>
+    </div>
+    
+    <!-- MODAL VISUALIZZAZIONE DOCUMENTO -->
+    <div id="document-viewer-modal" class="document-viewer-modal">
+        <div class="document-viewer-content">
+            <div class="document-viewer-header">
+                <div class="document-viewer-title" id="viewer-doc-title">Documento</div>
+                <button class="document-viewer-close" onclick="closeDocumentViewer()">×</button>
+            </div>
+            <div class="document-viewer-body" id="viewer-doc-body">
+                <!-- Contenuto documento -->
+            </div>
+            <div class="document-viewer-footer">
+                <button class="doc-btn doc-btn-send" onclick="sendSingleDocument()">📧 Invia al Toilettatore</button>
+                <button class="doc-btn doc-btn-delete" onclick="deleteSingleDocument()">🗑️ Elimina</button>
+            </div>
+        </div>
+    </div>
+    
+    <button class="help-button" onclick="openWelcomeModal()">?</button>
+    
+    <div id="welcome-modal">
+        <div class="welcome-content">
+            <button class="welcome-close" onclick="closeWelcomeModal()">×</button>
+            <h2 data-branding="welcome_title">👋 Ciao! Benvenuto nella nostra applicazione!</h2>
+
+            <button class="ios-help-button" onclick="openIosHelp(event)">iPhone / iPad: istruzioni installazione</button>
+
+            <p><strong>📋 ISTRUZIONI</strong></p>
+
+            <p><strong>📲 PRIMA COSA:</strong><br>Clicca il pulsante blu "INSTALLA APPLICAZIONE". È come mettere un giochetto nel telefono!</p>
+
+            <p><strong>🔍 ADESSO CERCA:</strong><br>Dopo che hai installato, guarda nelle pagine del home del tuo telefono. Cerca la nostra app come se cercassi un'icona! Quando la trovi, aprila!</p>
+
+            <p><strong>🔑 ADESSO INSERISCI IL CODICE:</strong><br>Dentro l'app clicca "INSERISCI CODICE DI ATTIVAZIONE". Poi scrivi il codice che ti abbiamo dato. È come aprire una porta segreta!</p>
+
+            <p>❌ CHIUDI:<br>Dopo che hai messo il codice, chiudi l'applicazione. Facile no?</p>
+
+            <p><strong>🎯 ULTIMO PASSO:</strong><br>Clicca "REGISTRATI QUI" così ricevi tutti i vantaggi riservati a te!</p>
+
+            <p>✉️ INVIA UN MESSAGGIO:<br>Se vuoi chiedere qualcosa o hai bisogno di informazioni utili per te, clicca "INVIA MESSAGGIO"! Te ne parliamo subito!</p>
+
+            <p>️ E NON FINISCE QUI:<br>Vi regaliamo anche la nostra Agenda Vocale! È un'app che ti aiuta a ricordare tutte le varie cose che devi fare! Clicca "INSTALLA AGENDA VOCALE GRATIS"!</p>
+
+            <p><strong>📌 QUESTA APP È UTILE PER TE!</strong></p>
+
+            <p>💡 Ricevi aggiornamenti, promozioni e offerte speciali che ti fanno risparmiare soldi!</p>
+
+            <p>💬 Scrivici quando vuoi, ti rispondiamo subito!</p>
+
+            <p>📢 Sei sempre il primo a sapere delle novità e delle offerte migliori!</p>
+
+            <p>📅 Hai la possibilità di prenotarti con la nostra agenda appuntamenti! Scegli nei pulsanti gialli il giorno che vuoi venire, scegli un orario, compila il nome e il telefono e invia. Il gioco è fatto!</p>
+
+            <p>✅ Questa applicazione è pensata per darti vantaggi di tempo e di soldi!</p>
+
+            <button class="welcome-button" onclick="closeWelcomeAndFocusInstall()">Ho capito!</button>
+        </div>
+    </div>
+
+    <div id="iosHelpModal" class="modal" onclick="closeIosHelp(event)">
+        <div class="modal-content ios-help-content" onclick="event.stopPropagation()">
+            <button class="ios-help-close" onclick="closeIosHelp(event)">X</button>
+            <h3>ISTRUZIONI iPHONE / iPAD</h3>
+            <p>Su iPhone e iPad l’app NON si installa con un pulsante.</p>
+            <p>Per installarla correttamente:</p>
+            <ol>
+                <li>Apri questo link in Safari (non da WhatsApp o altre app)</li>
+                <li>Tocca il pulsante Condividi (icona con il quadrato e la freccia)</li>
+                <li>Tocca “Aggiungi a Home”</li>
+            </ol>
+            <p>L’app comparirà nella schermata principale del telefono<br>come una normale applicazione.</p>
+        </div>
+    </div>
+
+<script src="agenda-cliente-001/version-check.js?v=20260207b"></script>
+<script src="agenda-cliente-001/vapid-guardian.js?v=20260208a"></script>
+<script src="agenda-cliente-001/app-core.js?v=20260208m"></script>
+<script src="agenda-cliente-001/vapid-push.js?v=20260208r"></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
