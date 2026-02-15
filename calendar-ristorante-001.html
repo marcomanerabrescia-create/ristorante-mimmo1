@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Prenotazioni</title>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <!-- PWA DISABILITATA SU CALENDARIO: nessun manifest, blocco registrazione Service Worker -->
+    <script>
+        // Rimuove eventuale manifest se presente per errore
+        const manifestLink = document.querySelector('link[rel=\"manifest\"]');
+        if (manifestLink) {
+            manifestLink.remove();
+            console.warn('[CALENDAR] Manifest rimosso: PWA disabilitata su calendario');
+        }
+        // Registra il Service Worker VAPID per abilitare le push lato calendario
+        if ('serviceWorker' in navigator) {
+            // navigator.serviceWorker.register('sw-toilet-001.js?v=' + Date.now(), {scope: ''})
+            //                 .then(reg => console.log('[CALENDAR] SW registrato', reg.scope))
+            //                 .catch(err => console.warn('[CALENDAR] SW non registrato', err));
+        }
+        const APPOINTMENT_DEBUG = false;
+        const PUSH_VPS_URL = '/ristorantemimmo1/PRENOTAZIONI/trace_reply.php'; // invio diretto al VPS
+        let currentPushSubscription = null;
+        const logAppointment = (...args) => {
+            if (APPOINTMENT_DEBUG) {
+                console.log(...args);
+            }
+        };
+        // Override: gestisce separatamente messaggi e appuntamenti
+        function showAppointmentDetails(event) {
+            logAppointment('?? Mostra dettagli appuntamento/messaggio:', event);
+            currentAppointment = event;
+            
+            const modal = document.getElementById('appointmentModal');
+            const modalHeader = document.getElementById('modalHeader');
+            const modalBody = document.getElementById('modalBody');
+            const modalButtons = document.getElementById('modalButtons');
+            const props = event.extendedProps || {};
+
+            if (props.tipo === 'messaggio') {
+                messageModalOpen = true;
+                const messageId = props.message_id || (event.id && event.id.toString().replace('msg-', '')) || currentMessageId;
+                const telefono = props.telefono_cliente || props.telefono || currentMessageTelefono || '';
+                const telefonoNorm = telefono ? telefono.toString().replace(/\D+/g, '') : '';
+                const messageClienteId = props.cliente_id || props.user_id || telefonoNorm || currentMessageUserId || '';
+                const testo = props.testo_messaggio || 'Nessun testo';
+                const ricevuto = props.ricevuto_label || props.data_invio || 'n/d';
+                const headerName = props.nome_cliente || 'Cliente';
+                const clienteTipo = props.cliente_tipo || props.tipo_cliente || props.tipo_dispositivo || props.platform || props.device || 'desktop';
+                cliente_token_fcm = props.cliente_token_fcm || '';
+                const pushEndpoint = props.push_endpoint || props.endpoint || '';
+                const pushP256dh = props.push_p256dh || props.p256dh || '';
+                const pushAuth = props.push_auth || props.auth || '';
+                currentPushSubscription = (pushEndpoint && pushP256dh && pushAuth) ? {
+                    endpoint: pushEndpoint,
+                    keys: { p256dh: pushP256dh, auth: pushAuth }
+                } : null;
+
+                console.log('[PUSH DEBUG] Apertura messaggio', { messageId, telefono, messageClienteId, clienteTipo });
+
+                currentMessageId = messageId || null;
+                currentMessageUserId = messageClienteId;
+                currentMessageTelefono = telefono;
+
+                const setTokenStatus = (msg, color) => {
+                    const tokenStatusEl = document.getElementById('tokenStatus');
+                    if (tokenStatusEl) {
+                        tokenStatusEl.textContent = msg;
+                        tokenStatusEl.style.color = color || '#6c7a89';
+                    }
+                };
+
+                modalHeader.innerHTML = `Messaggio da ${headerName}`;
+                modalBody.innerHTML = `
+                    <div class="detail-row"><strong>Tel:</strong> ${telefono || 'n/d'}</div>
+                    <div class="detail-row"><strong>Ricevuto:</strong> ${ricevuto}</div>
+                    <div class="detail-row" style="white-space:pre-wrap; text-align:left;">
+                        <strong>Testo:</strong><br>${testo}
+                    </div>
+                    <div class="detail-row">
+                        <strong>Risposta push:</strong><br>
+                        <textarea id="replyText" rows="3" style="width:100%; box-sizing:border-box;"></textarea>
+                    </div>
+                    <div id="tokenStatus" style="margin-top:5px; font-size:0.9em; color:#6c7a89;">Token non ancora caricato</div>
+                `;
+                modalButtons.innerHTML = `
+                    <button type="button" class="btn btn-confirm" id="btn-rispondi" data-cid="${messageClienteId || ''}" data-tel="${telefono || ''}">Rispondi (push)</button>
+                    <button type="button" class="btn btn-confirm" onclick="markMessageRead('${messageId || ''}')">Segna come letto</button>
+                    <button type="button" class="btn btn-reject" onclick="deleteMessage('${messageId || ''}')">Elimina</button>
+                    <button type="button" class="btn btn-close" onclick="closeAppointmentModal()">Chiudi</button>
+                `;
+
+                if (currentPushSubscription && currentPushSubscription.endpoint) {
+                    console.log('[PUSH DEBUG] Subscription già presente dal messaggio, skip lookup');
+                    setTokenStatus('Subscription dal messaggio ✅', '#218c74');
+                } else if (currentMessageUserId) {
+                    setTokenStatus('Caricamento token...');
+                    const tokenUrl = 'get-token-from-db.php?cliente_id=' + encodeURIComponent(currentMessageUserId || '') + (currentMessageTelefono ? '&telefono=' + encodeURIComponent(currentMessageTelefono) : '');
+                    console.log('[PUSH DEBUG] Richiesta token:', tokenUrl);
+                    fetch(tokenUrl)
+                        .then(r => r.json())
+                        .then(data => {
+                            cliente_token_fcm = data.token_fcm || '';
+                            if (data.subscription && data.subscription.endpoint && data.subscription.keys && data.subscription.keys.p256dh && data.subscription.keys.auth) {
+                                currentPushSubscription = data.subscription;
+                            }
+                            if (cliente_token_fcm || currentPushSubscription) {
+                                console.log('[PUSH DEBUG] Token/subscription caricati dal server', { token: cliente_token_fcm, sub: currentPushSubscription });
+                                setTokenStatus('Subscription push trovata', '#218c74');
+                            } else {
+                                setTokenStatus('Subscription non disponibile sul server', '#c0392b');
+                                alert('Subscription push non disponibile');
+                            }
+                        })
+                        .catch(err => {
+                            console.error('[PUSH DEBUG] Errore token:', err);
+                            cliente_token_fcm = '';
+                            currentPushSubscription = null;
+                            setTokenStatus('Errore caricamento token', '#c0392b');
+                        });
+                } else {
+                    setTokenStatus('Cliente non identificato', '#c0392b');
+                }
+
+                const btnRispondi = document.getElementById('btn-rispondi');
+                if (btnRispondi) {
+                    const clone = btnRispondi.cloneNode(true);
+                    btnRispondi.parentNode.replaceChild(clone, btnRispondi);
+                    clone.addEventListener('click', function() {
+                        console.log('[PUSH DEBUG] Click su Rispondi (push)', { cid: this.dataset.cid, tel: this.dataset.tel, clienteTipo });
+                        const cid = this.dataset.cid || currentMessageUserId || '';
+                        const tel = this.dataset.tel || currentMessageTelefono || '';
+                        replyToMessage(cid, tel, clienteTipo);
+                    });
+                }
+
+                modal.style.display = 'block';
+                console.log('Modal messaggio mostrato');
+                return;
+            }
+
+            modalHeader.innerHTML = `${event.title}`;
+            
+            const status = props.status || 'pending';
+            logAppointment('?? Status appuntamento:', status, 'Props:', props);
+            
+            let badge = '';
+            if (status === 'pending') {
+                badge = '<span class="status-badge status-pending">In Attesa</span>';
+            } else if (status === 'confirmed' || status === 'confermato') {
+                badge = '<span class="status-badge status-confirmed">Confermato</span>';
+            } else if (status === 'rejected' || status === 'rifiutato') {
+                badge = '<span class="status-badge status-rejected">Rifiutato</span>';
+            }
+            
+            modalBody.innerHTML = `
+                <div class="detail-row">${badge}</div>
+                <div class="detail-row">
+                    <strong>Data:</strong> ${event.start.toLocaleDateString('it-IT', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })}
+                </div>
+                <div class="detail-row">
+                    <strong>Ora:</strong> ${event.start.toLocaleTimeString('it-IT', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    })}
+                </div>
+                ${props.customer_name ? `<div class="detail-row"><strong>Cliente:</strong> ${props.customer_name}</div>` : ''}
+                ${props.pet_name ? `<div class="detail-row"><strong>Nome:</strong> ${props.pet_name}</div>` : ''}
+                ${props.servizio ? `<div class="detail-row"><strong>Servizio:</strong> ${props.servizio}</div>` : ''}
+                ${props.telefono ? `<div class="detail-row"><strong>Tel:</strong> ${props.telefono}</div>` : ''}
+                ${props.note ? `<div class="detail-row"><strong>Note:</strong> ${props.note}</div>` : ''}
+            `;
+            
+            if (status === 'pending') {
+                modalButtons.innerHTML = `
+                    <button type="button" class="btn btn-confirm" onclick="confirmAppointment()">Conferma</button>
+                    <button type="button" class="btn btn-reschedule" onclick="showRescheduleForm()">Sposta</button>
+                    <button type="button" class="btn btn-reject" onclick="rejectAppointment()">Rifiuta</button>
+                    <button type="button" class="btn btn-reject" onclick="deleteAppointment()">Elimina</button>
+                    <button type="button" class="btn btn-close" onclick="closeAppointmentModal()">Chiudi</button>
+                `;
+            } else if (status === 'confirmed' || status === 'confermato') {
+                modalButtons.innerHTML = `
+                    <button type="button" class="btn btn-reschedule" onclick="showRescheduleForm()">Sposta</button>
+                    <button type="button" class="btn btn-reject" onclick="rejectAppointment()">Annulla</button>
+                    <button type="button" class="btn btn-reject" onclick="deleteAppointment()">Elimina</button>
+                    <button type="button" class="btn btn-close" onclick="closeAppointmentModal()">Chiudi</button>
+                `;
+            } else {
+                modalButtons.innerHTML = `
+                    <button type="button" class="btn btn-reject" onclick="deleteAppointment()">Elimina</button>
+                    <button type="button" class="btn btn-close" onclick="closeAppointmentModal()">Chiudi</button>
+                `;
+            }
+            
+            modal.style.display = 'block';
+            logAppointment('? Modal appuntamento mostrato');
+        }
+        window.openAppointmentModal = function(event) {
+            showAppointmentDetails(event);
+        };
+
+        async function markMessageRead(messageId) {
+            const targetId = messageId || currentMessageId;
+            if (!targetId) return;
+            try {
+                const response = await fetch(API_URL + '?action=message', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: targetId, stato: 'letto'})
+                });
+                const result = await response.json();
+                updateStatus(result && result.success === false ? 'Errore aggiornamento messaggio' : 'Messaggio segnato come letto');
+                if (calendar) {
+                    calendar.refetchEvents();
+                }
+                closeAppointmentModal();
+            } catch (err) {
+                console.error('Errore markMessageRead:', err);
+                updateStatus('Errore aggiornamento messaggio');
+            }
+        }
+        async function deleteMessage(messageId) {
+            const targetId = messageId || currentMessageId;
+            if (!targetId) return;
+            if (!confirm('Eliminare questo messaggio?')) return;
+            try {
+                const response = await fetch(API_URL + '?action=message', {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: targetId})
+                });
+                const result = await response.json();
+                updateStatus(result && result.success === false ? 'Errore eliminazione messaggio' : 'Messaggio eliminato');
+                if (calendar) {
+                    calendar.refetchEvents();
+                }
+                closeAppointmentModal();
+            } catch (err) {
+                console.error('Errore deleteMessage:', err);
+                updateStatus('Errore eliminazione messaggio');
+            }
+        }
+        async function replyToMessage(userId, telefono, tipoCliente) {
+            console.log(' STEP 3 - CLICK RICEVUTO', {userId, telefono, tipoCliente});
+            console.log('DEBUG 3.1 - Cerco replyText');
+            const replyTextEl = document.getElementById('replyText');
+            console.log('DEBUG 3.2 - replyTextEl:', replyTextEl);
+            const replyText = replyTextEl ? replyTextEl.value : '';
+
+            // Step 1: salva il messaggio nel DB
+            const clienteId = userId || currentMessageUserId || '';
+            const telefonoCliente = telefono || currentMessageTelefono || '';
+            const nomeCliente = currentAppointment?.extendedProps?.nome_cliente || 'Cliente';
+
+            try {
+                const saveResp = await fetch(API_URL + '?action=message', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        tipo: 'risposta_gestore',
+                        nome_cliente: nomeCliente,
+                        telefono_cliente: telefonoCliente,
+                        testo_messaggio: replyText,
+                        stato: 'inviato',
+                        cliente_id: clienteId,
+                        user_id: clienteId
+                    })
+                });
+                const saveJson = await saveResp.json().catch(() => ({}));
+                console.log('[SAVE MESSAGE] response', saveResp.status, saveJson);
+                if (!saveResp.ok || !saveJson.success) {
+                    alert((saveJson && saveJson.message) || 'Errore salvataggio messaggio');
+                    return;
+                }
+            } catch (err) {
+                console.error('[SAVE MESSAGE] errore', err);
+                alert('Errore salvataggio messaggio');
+                return;
+            }
+
+            // Step 2: invia push via VPS
+            const subscription = currentPushSubscription;
+            if (!subscription || !subscription.endpoint || !subscription.keys || !subscription.keys.p256dh || !subscription.keys.auth) {
+                alert('Subscription push non disponibile per questo cliente (manca endpoint/keys)');
+                return;
+            }
+
+            console.log('DEBUG 3.7 - Costruisco payload per VPS');
+            const payload = {
+                message: replyText || " ",
+                cliente_id: clienteId,
+                telefono: telefonoCliente,
+                source: "calendar_reply"
+            };
+            console.log(' STEP 4 - PAYLOAD INVIATO', payload);
+            try {
+                const pushResp = await fetch(PUSH_VPS_URL, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                const pushJson = await pushResp.json().catch(() => ({}));
+                console.log('STEP 5 - RISPOSTA:', pushJson);
+                if (!pushJson || !pushJson.success) {
+                    updateStatus((pushJson && pushJson.error) || (pushJson && pushJson.message) || 'Errore invio push');
+                    return;
+                }
+                console.log('Push inviata tramite VPS');
+                updateStatus('Push inviata');
+            } catch (err) {
+                console.error('STEP 6 - ERRORE:', err);
+                alert('Errore invio push');
+                return;
+            }
+
+            // Step 3: chiudi popup
+            closeAppointmentModal();
+            // Step 4: aggiorna calendario
+            if (calendar) {
+                calendar.refetchEvents();
+            }
+        }
+        
+        console.log('? Script caricato completamente');
+    </script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+            
+            .btn-promo {
+                width: 100%;
+            }
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 8px 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 1.3em;
+        }
+        
+        .btn-promo {
+            background: #27ae60;
+            color: white;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: all 0.3s;
+        }
+        
+        .btn-promo:hover {
+            background: #229954;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .toggle-container {
+            background: white;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #27ae60;
+        }
+        
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        .toggle-label {
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .status {
+            background: #27ae60;
+            color: white;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+            text-align: center;
+        }
+        
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 3px;
+            text-align: center;
+        }
+        
+        #calendar {
+            background: white;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-height: 600px;
+        }
+        
+        .fc-button {
+            font-size: 0.75em !important;
+            padding: 4px 8px !important;
+        }
+        
+        .fc-toolbar-title {
+            font-size: 1.2em !important;
+        }
+
+.fc-col-header-cell-cushion {
+    font-size: 14px !important;
+    padding: 8px 2px !important;
+}
+
+.fc-timegrid-slot {
+    height: 3em !important;
+}
+
+        @media (max-width: 768px) {
+            #calendar {
+                padding: 10px;
+            }
+            
+            .fc-button {
+                font-size: 0.65em !important;
+                padding: 3px 6px !important;
+            }
+            
+            .fc-toolbar-title {
+                font-size: 1em !important;
+            }
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .detail-row {
+            padding: 10px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .detail-label {
+            font-weight: bold;
+            color: #555;
+            margin-right: 10px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .btn-confirm {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-confirm:hover {
+            background: #229954;
+        }
+
+        .btn-reschedule {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn-reschedule:hover {
+            background: #e67e22;
+        }
+
+        .btn-reject {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background: #c0392b;
+        }
+
+        .btn-close {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-close:hover {
+            background: #7f8c8d;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .status-pending {
+            background: #f39c12;
+            color: white;
+        }
+
+        .status-confirmed {
+            background: #27ae60;
+            color: white;
+        }
+
+        .status-rejected {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .reschedule-form {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: #ecf0f1;
+            border-radius: 5px;
+        }
+
+        .reschedule-form input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #bdc3c7;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🐾 Agenda Prenotazioni</h1>
+        <a href="/ristorantemimmo1/PRENOTAZIONI/admin-promo-ristorante-001.html" target="_blank" class="btn-promo">📢 Gestione Informazioni</a>
+    </div>
+    
+    <div class="toggle-container">
+        <div class="toggle-item">
+            <span class="toggle-label">Conferma automatica</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="autoConfirmToggle" checked onchange="toggleAutoConfirm()">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+        <div class="toggle-item">
+            <span class="toggle-label">Conferma manuale</span>
+            <label class="toggle-switch">
+                <input type="checkbox" id="manualConfirmToggle" onchange="toggleManualConfirm()">
+                <span class="toggle-slider"></span>
+            </label>
+        </div>
+    </div>
+    
+    <div class="status" id="status">
+        ✅ Sistema pronto - Connessione OK
+    </div>
+    
+    <div id="calendar"></div>
+
+    <div id="appointmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalHeader">
+                📋 Dettagli Appuntamento
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-buttons" id="modalButtons"></div>
+            <div class="reschedule-form" id="rescheduleForm">
+                <h4>📅 Nuova Data e Ora</h4>
+                <input type="date" id="newDate">
+                <input type="time" id="newTime">
+                <button type="button" class="btn btn-confirm" onclick="saveReschedule()">Salva</button>
+                <button type="button" class="btn btn-close" onclick="hideRescheduleForm()">Annulla</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('🔵 AVVIO APPLICAZIONE AGENDA');
+        const API_URL = 'api.php';
+        console.log('📡 API URL:', API_URL);
+        
+        let calendar;
+        let currentAppointment = null;
+        let currentMessageId = null;
+        let currentMessageUserId = '';
+        let currentMessageTelefono = '';
+        let cliente_token_fcm = '';
+        let messageModalOpen = false;
+        let autoConfirmMode = true;
+        let manualConfirmMode = false;
+        let autoConfirmInterval = null;
+        
+        function loadSavedPreferences() {
+            logAppointment('📂 Caricamento preferenze salvate...');
+            const savedAuto = localStorage.getItem('autoConfirmMode');
+            const savedManual = localStorage.getItem('manualConfirmMode');
+            logAppointment('💾 Preferenze trovate - Auto:', savedAuto, 'Manual:', savedManual);
+            
+            if (savedAuto !== null) {
+                autoConfirmMode = savedAuto === 'true';
+                manualConfirmMode = savedManual === 'true';
+                
+                document.getElementById('autoConfirmToggle').checked = autoConfirmMode;
+                document.getElementById('manualConfirmToggle').checked = manualConfirmMode;
+                
+                if (autoConfirmMode) {
+                    updateStatus('✅ Modalità: Conferma automatica attiva');
+                } else {
+                    updateStatus('✅ Modalità: Conferma manuale attiva');
+                }
+            } else {
+                logAppointment('⚠️ Nessuna preferenza salvata, uso default');
+                updateStatus('✅ Modalità: Conferma automatica attiva (default)');
+            }
+        }
+        
+        function startAutoConfirm() {
+            logAppointment('🚀 startAutoConfirm chiamata');
+            stopAutoConfirm();
+            if (autoConfirmMode && !manualConfirmMode) {
+                logAppointment('🔄 Avvio timer auto-conferma (10 secondi)');
+                autoConfirmInterval = setInterval(() => {
+                    logAppointment('⏰ Timer auto-conferma scattato');
+                    fetch(API_URL)
+                        .then(r => {
+                            logAppointment('📡 Risposta fetch auto-conferma:', r.status);
+                            return r.json();
+                        })
+                        .then(data => {
+                            logAppointment('📋 Dati ricevuti per auto-conferma:', data);
+                            if (Array.isArray(data)) {
+                                autoConfirmPendingAppointments(data);
+                            }
+                        })
+                        .catch(err => console.error('💥 Errore auto-conferma:', err));
+                }, 10000);
+            } else {
+                console.log('⏸️ Auto-conferma NON avviata (Mode:', autoConfirmMode, 'Manual:', manualConfirmMode, ')');
+            }
+        }
+        
+        function stopAutoConfirm() {
+            if (autoConfirmInterval) {
+                console.log('⏹️ Stop timer auto-conferma');
+                clearInterval(autoConfirmInterval);
+                autoConfirmInterval = null;
+            } else {
+                console.log('⏸️ Timer auto-conferma già fermo');
+            }
+        }
+        
+        function toggleAutoConfirm() {
+            console.log('🔘 Toggle Auto-Conferma');
+            const autoToggle = document.getElementById('autoConfirmToggle');
+            const manualToggle = document.getElementById('manualConfirmToggle');
+            
+            if (autoToggle.checked) {
+                console.log('✅ Auto-conferma ATTIVATA');
+                autoConfirmMode = true;
+                manualConfirmMode = false;
+                manualToggle.checked = false;
+                updateStatus('✅ Modalità: Conferma automatica attiva');
+                
+                localStorage.setItem('autoConfirmMode', 'true');
+                fetch('proxy_vps.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({auto_confirm: true})
+                }).catch(err => console.error('Errore VPS:', err));
+                localStorage.setItem('manualConfirmMode', 'false');
+                
+                startAutoConfirm();
+                loadCalendar();
+            } else {
+                console.log('❌ Auto-conferma DISATTIVATA');
+                autoConfirmMode = false;
+                stopAutoConfirm();
+                if (!manualConfirmMode) {
+                    console.log('🔄 Attivo modalità manuale automaticamente');
+                    manualConfirmMode = true;
+                    manualToggle.checked = true;
+                    localStorage.setItem('autoConfirmMode', 'false');
+                    localStorage.setItem('manualConfirmMode', 'true');
+                    updateStatus('✅ Modalità: Conferma manuale attiva');
+                }
+            }
+        }
+        
+        function toggleManualConfirm() {
+            console.log('🔘 Toggle Conferma Manuale');
+            const autoToggle = document.getElementById('autoConfirmToggle');
+            const manualToggle = document.getElementById('manualConfirmToggle');
+            
+            if (manualToggle.checked) {
+                console.log('✅ Conferma manuale ATTIVATA');
+                manualConfirmMode = true;
+                autoConfirmMode = false;
+                autoToggle.checked = false;
+                updateStatus('✅ Modalità: Conferma manuale attiva');
+                
+                localStorage.setItem('autoConfirmMode', 'false');
+                fetch('proxy_vps.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({auto_confirm: false})
+                }).catch(err => console.error('Errore VPS:', err));
+                localStorage.setItem('manualConfirmMode', 'true');
+                
+                stopAutoConfirm();
+            } else {
+                console.log('❌ Conferma manuale DISATTIVATA');
+                manualConfirmMode = false;
+                if (!autoConfirmMode) {
+                    console.log('🔄 Attivo auto-conferma automaticamente');
+                    autoConfirmMode = true;
+                    autoToggle.checked = true;
+                    localStorage.setItem('autoConfirmMode', 'true');
+                    localStorage.setItem('manualConfirmMode', 'false');
+                    updateStatus('✅ Modalità: Conferma automatica attiva');
+                    startAutoConfirm();
+                }
+            }
+        }
+        
+        function getAppointmentDisplayData(appt) {
+            const props = (appt && appt.extendedProps) ? appt.extendedProps : {};
+            const name = props.nome_cliente || props.customer_name || appt.title || appt.customer_name || 'Cliente';
+            const rawStart = appt.start || appt.startStr || props.appointment_date || appt.appointment_date || '';
+            const rawTime = props.appointment_time || appt.appointment_time || '';
+
+            let dateStr = '';
+            let timeStr = '';
+            let dateObj = null;
+
+            if (rawStart) {
+                if (rawStart instanceof Date) {
+                    dateObj = rawStart;
+                } else {
+                    const rawStartStr = String(rawStart);
+                    if (rawStartStr.includes('T')) {
+                        dateObj = new Date(rawStartStr);
+                    } else if (rawTime) {
+                        dateObj = new Date(rawStartStr + 'T' + rawTime);
+                    } else {
+                        dateObj = new Date(rawStartStr.replace(' ', 'T'));
+                    }
+                }
+            }
+
+            if (dateObj && !isNaN(dateObj)) {
+                dateStr = dateObj.toLocaleDateString('it-IT');
+                timeStr = dateObj.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+            } else if (rawStart) {
+                const rawStartStr = String(rawStart);
+                if (rawStartStr.includes('T')) {
+                    const parts = rawStartStr.split('T');
+                    dateStr = parts[0] || '';
+                    timeStr = (parts[1] || '').slice(0, 5);
+                } else {
+                    dateStr = rawStartStr;
+                    timeStr = rawTime || '';
+                }
+            } else {
+                dateStr = rawStart || '';
+                timeStr = rawTime || '';
+            }
+
+            return {
+                name,
+                dateStr,
+                timeStr,
+                pushEndpoint: props.push_endpoint || '',
+                activationCode: props.activation_code || '',
+                telefono: props.telefono || ''
+            };
+        }
+
+        function sendConfirmationPush(appt) {
+            const appointmentId = appt.id || appt.extendedProps?.id;
+            
+            if (!appointmentId) {
+                console.error('❌ Nessun ID appuntamento per push');
+                return Promise.resolve();
+            }
+            
+            const payload = {
+                appointment_id: appointmentId
+            };
+            
+            return fetch('https://puschpromozioni.it/ristorantemimmo1/PRENOTAZIONI/send_push_user.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Push conferma inviata:', data);
+            })
+            .catch(error => {
+                console.error('❌ Errore push conferma:', error);
+            });
+        }
+
+        function autoConfirmPendingAppointments(appointments) {
+            console.log('🔍 Controllo appuntamenti pending per auto-conferma');
+            if (!autoConfirmMode || manualConfirmMode) {
+                console.log('⏸️ Auto-conferma saltata (Mode:', autoConfirmMode, 'Manual:', manualConfirmMode, ')');
+                return;
+            }
+            
+            let pendingCount = 0;
+            appointments.forEach(appt => {
+                const status = appt.extendedProps?.status || 'pending';
+                
+                if (status === 'pending') {
+                    pendingCount++;
+                    logAppointment('🔄 Auto-conferma appuntamento ID:', appt.id, 'Cliente:', appt.title);
+                    
+                    fetch(API_URL, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({id: appt.id, status: 'confirmed'})
+                    })
+                    .then(response => {
+                        console.log('📡 Risposta auto-conferma:', response.status);
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('✅ Confermato automaticamente ID:', appt.id, 'Risultato:', data);
+                        console.log(' AUTO-CONFERMA: Chiamo sendConfirmationPush con appt:', appt);
+                        sendConfirmationPush(appt);
+                        updateStatus('✅ Confermato automaticamente');
+                    })
+                    .catch(error => {
+                        console.error('❌ Errore auto-conferma ID:', appt.id, error);
+                    });
+                }
+            });
+            console.log('📊 Trovati', pendingCount, 'appuntamenti pending');
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎬 DOM Loaded - Inizializzazione calendario');
+            loadSavedPreferences();
+            
+            const calendarEl = document.getElementById('calendar');
+            
+            calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                height: 'auto',
+                locale: 'it',
+                firstDay: 1,
+                showNonCurrentDates: false,
+                fixedWeekCount: false,
+                dayMaxEventRows: 1,
+                views: {
+                    dayGridMonth: {
+                        dayMaxEventRows: 1
+                    },
+                    timeGridWeek: {
+                        dayHeaderFormat: { weekday: 'short', day: 'numeric' }
+                    }
+                },
+                buttonText: {
+                    today: 'Oggi',
+                    month: 'Mese',
+                    week: 'Settimana',
+                    day: 'Giorno'
+                },
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                
+                customButtons: {
+                    today: {
+                        text: 'Oggi',
+                        click: function() {
+                            console.log('📅 Click su "Oggi"');
+                            calendar.today();
+                        }
+                    }
+                },
+                
+                events: function(info, successCallback, failureCallback) {
+                    console.log('?? Caricamento eventi calendario...');
+
+                    const fetchAppointments = fetch(API_URL)
+                        .then(response => {
+                            console.log('?? Risposta API eventi:', response.status);
+                            if (!response.ok) {
+                                throw new Error('HTTP ' + response.status);
+                            }
+                            return response.json();
+                        });
+
+                    const fetchMessages = fetch(API_URL + '?action=messages')
+                        .then(response => {
+                            if (!response.ok) throw new Error('HTTP ' + response.status);
+                            return response.json();
+                        })
+                        .catch(() => []);
+
+                    Promise.all([fetchAppointments, fetchMessages])
+                        .then(([appointments, messages]) => {
+                            if (!Array.isArray(appointments)) {
+                                console.error('? Errore: risposta non Š array:', typeof appointments);
+                                updateStatus('Errore: API non ha restituito una lista di appuntamenti');
+                                successCallback([]);
+                                return;
+                            }
+
+                            console.log('? Appuntamenti caricati:', appointments.length);
+                            updateStatus('Caricati ' + appointments.length + ' appuntamenti');
+
+                            const mappedMessages = Array.isArray(messages)
+                                ? messages
+                                    .filter(msg => (msg.tipo || 'messaggio') === 'messaggio')
+                                    .map(msg => {
+                                    const sentAtRaw = msg.data_invio || msg.created_at || msg.timestamp || msg.inviato_il || msg.ricevuto_il || msg.received_at || msg.data || '';
+                                    let sentAt = null;
+                                    if (sentAtRaw !== '' && sentAtRaw !== null && sentAtRaw !== undefined) {
+                                        // Gestisce stringhe data/ora e timestamp numerici (sec/ms)
+                                        if (!isNaN(sentAtRaw)) {
+                                        const num = Number(sentAtRaw);
+                                        const ms = num > 1e11 ? num : num * 1000;
+                                        sentAt = new Date(ms);
+                                    } else {
+                                        sentAt = new Date(sentAtRaw.toString().replace(' ', 'T'));
+                                    }
+                                }
+                                if (!(sentAt instanceof Date) || isNaN(sentAt)) {
+                                    sentAt = new Date();
+                                }
+                                const ricevutoStr = sentAt.toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
+                                const clienteId = msg.cliente_id || msg.clienteId || msg.user_id || msg.userId || (msg.telefono_cliente ? msg.telefono_cliente.toString().replace(/\\D+/g, '') : '') || '';
+                                return {
+                                    id: 'msg-' + msg.id,
+                                    title: 'Messaggio da ' + (msg.nome_cliente || 'sconosciuto') + (msg.telefono_cliente ? ' (' + msg.telefono_cliente + ')' : '') + ' - ' + ricevutoStr,
+                                    start: sentAt,
+                                    backgroundColor: (msg.stato === 'letto') ? '#7f8c8d' : '#8e44ad',
+                                    borderColor: (msg.stato === 'letto') ? '#7f8c8d' : '#8e44ad',
+                                    extendedProps: {
+                                        tipo: msg.tipo || 'messaggio',
+                                        nome_cliente: msg.nome_cliente || '',
+                                        telefono_cliente: msg.telefono_cliente || '',
+                                        testo_messaggio: msg.testo_messaggio || '',
+                                        data_invio: sentAtRaw || sentAt.toISOString(),
+                                        stato: msg.stato || 'da_leggere',
+                                        ricevuto_label: 'Messaggio ricevuto il ' + ricevutoStr,
+                                        cliente_tipo: msg.cliente_tipo || msg.tipo_cliente || msg.tipo_dispositivo || msg.platform || msg.device || 'desktop',
+                                        cliente_token_fcm: msg.cliente_token_fcm || msg.token_fcm || msg.push_token || msg.token || '',
+                                        message_id: msg.id,
+                                        cliente_id: clienteId,
+                                        user_id: msg.user_id || msg.userId || msg.cliente_id || msg.clienteId || clienteId
+                                    }
+                                };
+                            }) : [];
+
+                            const allEvents = [...appointments, ...mappedMessages];
+                            updateStatus('Caricati ' + allEvents.length + ' elementi (appuntamenti + messaggi)');
+                            successCallback(allEvents);
+                        })
+                        .catch(error => {
+                            console.error('Errore combinazione appuntamenti/messaggi:', error);
+                            updateStatus('Errore: ' + error.message);
+                            failureCallback(error);
+                        });
+                },
+
+                eventClick: function(info) {
+                    console.log('🖱️ Click su evento:', info.event.id, info.event.title);
+                    openAppointmentModal(info.event);
+                },
+                
+                dateClick: function(info) {
+                    console.log('🖱️ Click su data:', info.dateStr);
+                    showDateClickModal(info.dateStr);
+                }
+            });
+                          
+            calendar.render();
+            console.log('✅ Calendario renderizzato');
+            updateStatus('✅ Calendario pronto');
+            
+            if (autoConfirmMode) {
+                startAutoConfirm();
+            }
+            
+            setInterval(() => {
+                console.log('🔄 Refresh automatico calendario (8 sec)');
+                loadCalendar();
+            }, 8000);
+        });
+        
+        function confirmAppointment() {
+            if (!currentAppointment) return;
+            logAppointment('🔘 Conferma manuale appuntamento ID:', currentAppointment.id);
+            if (!confirm('Vuoi confermare questo appuntamento?')) {
+                return;
+            }
+            updateAppointmentStatus(currentAppointment.id, 'confirmed', currentAppointment);
+            updateStatus('✅ Appuntamento confermato');
+            sendConfirmationPush(currentAppointment);
+            closeAppointmentModal();
+        }
+        
+        function rejectAppointment() {
+            if (!currentAppointment) return;
+            logAppointment('❌ Richiesta rifiuto appuntamento ID:', currentAppointment.id);
+            if (confirm('❌ Rifiutare questo appuntamento?')) {
+                updateAppointmentStatus(currentAppointment.id, 'rejected');
+                updateStatus('❌ Appuntamento rifiutato');
+                closeAppointmentModal();
+            } else {
+                console.log('⏸️ Rifiuto annullato dall\'utente');
+            }
+        }
+        
+        function deleteAppointment() {
+            if (!currentAppointment) return;
+            logAppointment('🗑️ Richiesta eliminazione appuntamento ID:', currentAppointment.id);
+            if (confirm('🗑️ Eliminare definitivamente questo appuntamento?')) {
+                console.log('🚀 Invio DELETE...');
+                fetch(API_URL, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: currentAppointment.id})
+                })
+                .then(response => {
+                    console.log('📡 Risposta DELETE:', response.status);
+                    return response.json();
+                })
+                .then(result => {
+                    console.log('✅ Risultato DELETE:', result);
+                    updateStatus('🗑️ Appuntamento eliminato');
+                    loadCalendar();
+                    setTimeout(loadCalendar, 1000);
+                    closeAppointmentModal();
+                })
+                .catch(error => {
+                    console.error('💥 Errore DELETE:', error);
+                    updateStatus('❌ Errore eliminazione');
+                });
+            } else {
+                console.log('⏸️ Eliminazione annullata dall\'utente');
+            }
+        }
+        
+        function showRescheduleForm() {
+            console.log('📅 Mostra form spostamento');
+            document.getElementById('rescheduleForm').style.display = 'block';
+            if (currentAppointment && currentAppointment.start) {
+                const date = currentAppointment.start;
+                document.getElementById('newDate').value = date.toISOString().split('T')[0];
+                document.getElementById('newTime').value = date.toTimeString().substring(0, 5);
+                console.log('📋 Form popolato con data:', date);
+            }
+        }
+        
+        function hideRescheduleForm() {
+            console.log('❌ Nascondi form spostamento');
+            document.getElementById('rescheduleForm').style.display = 'none';
+        }
+        
+        function saveReschedule() {
+            console.log('💾 Salva spostamento');
+            const newDate = document.getElementById('newDate').value;
+            const newTime = document.getElementById('newTime').value;
+            console.log('📅 Nuova data:', newDate, 'Nuova ora:', newTime);
+            
+            if (!newDate || !newTime) {
+                console.log('⚠️ Data o ora mancante');
+                alert('⚠️ Inserisci data e ora');
+                return;
+            }
+            
+            updateAppointmentDateTime(currentAppointment.id, newDate + 'T' + newTime + ':00');
+            updateStatus('📅 Appuntamento spostato');
+            hideRescheduleForm();
+            closeAppointmentModal();
+        }
+        
+                function closeAppointmentModal() {
+            logAppointment('❌ Chiusura modal appuntamento');
+            document.getElementById('appointmentModal').style.display = 'none';
+            hideRescheduleForm();
+            currentAppointment = null;
+            messageModalOpen = false;
+        }
+
+window.onclick = function(event) {
+            const modal = document.getElementById('appointmentModal');
+            if (event.target === modal) {
+                console.log('🖱️ Click fuori dal modal - chiusura');
+                closeAppointmentModal();
+            }
+        };
+        
+        function updateAppointmentStatus(id, newStatus, apptData) {
+            console.log('📡 PUT Status - ID:', id, 'Nuovo Status:', newStatus);
+            
+            fetch(API_URL, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: id, status: newStatus})
+            })
+            .then(response => {
+                console.log('📡 Risposta PUT Status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('✅ Risultato PUT Status:', data);
+                if (newStatus === 'confirmed') {
+                    console.log(' DEBUG: Chiamo sendConfirmationPush con:', apptData || currentAppointment || {});
+                    sendConfirmationPush(apptData || currentAppointment || {});
+                }
+                loadCalendar();
+                setTimeout(loadCalendar, 1000);
+            })
+            .catch(error => {
+                console.error('💥 Errore PUT Status:', error);
+                updateStatus('❌ Errore aggiornamento');
+            });
+        }
+        
+        function updateAppointmentDateTime(id, newDateTime) {
+            console.log('📡 PUT DateTime - ID:', id, 'Nuovo DateTime:', newDateTime);
+            
+            fetch(API_URL, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({id: id, start: newDateTime})
+            })
+            .then(response => {
+                console.log('📡 Risposta PUT DateTime:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('✅ Risultato PUT DateTime:', data);
+                loadCalendar();
+                setTimeout(loadCalendar, 1000);
+            })
+            .catch(error => {
+                console.error('💥 Errore PUT DateTime:', error);
+                updateStatus('❌ Errore aggiornamento');
+            });
+        }
+        
+        function updateStatus(message) {
+            console.log('💬 Status update:', message);
+            const el = document.getElementById('status');
+            el.innerHTML = message;
+            el.className = message.includes('❌') ? 'error' : 'status';
+        }
+        
+        function loadCalendar() {
+            if (calendar) {
+                console.log('🔄 Ricarico eventi calendario...');
+                calendar.refetchEvents();
+                console.log('✅ Ricaricato:', new Date().toLocaleTimeString());
+            }
+        }
+        
+        function addAppointment(nome, data) {
+            logAppointment('➕ Creazione nuovo appuntamento - Nome:', nome, 'Data:', data);
+            fetch(API_URL, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    customer_name: nome,
+                    appointment_date: data,
+                    appointment_time: '09:00',
+                    status: 'pending',
+                    timestamp: new Date().toISOString()
+                })
+            })
+            .then(response => {
+                console.log('📡 Risposta POST:', response.status);
+                return response.json();
+            })
+            .then(result => {
+                console.log('📋 Risultato POST:', result);
+                if (result.status === 'saved') {
+                    console.log('✅ Appuntamento salvato con successo');
+                    updateStatus('✅ Salvato: ' + nome);
+                    loadCalendar();
+                } else {
+                    console.log('⚠️ Risposta inattesa:', result);
+                }
+            })
+            .catch(error => {
+                console.error('💥 Errore POST:', error);
+                updateStatus('❌ Errore salvataggio');
+            });
+        }
+        
+        function showDateClickModal(dateStr) {
+            console.log('📅 Click su data:', dateStr);
+            const modal = document.getElementById('appointmentModal');
+            const modalHeader = document.getElementById('modalHeader');
+            const modalBody = document.getElementById('modalBody');
+            const modalButtons = document.getElementById('modalButtons');
+            
+            const date = new Date(dateStr);
+            const dateFormatted = date.toLocaleDateString('it-IT', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+            
+            modalHeader.innerHTML = `📅 ${dateFormatted}`;
+            modalBody.innerHTML = `<p style="text-align:center; font-size:1.1em;">Cosa vuoi fare?</p>`;
+            modalButtons.innerHTML = `
+                <button type="button" class="btn btn-confirm" onclick="createAppointment('${dateStr}')">📝 Prenota Appuntamento</button>
+                <button type="button" class="btn btn-reject" onclick="showBlockHoursForm('${dateStr}')">🚫 Blocca Orari</button>
+                <button type="button" class="btn btn-close" onclick="closeAppointmentModal()">Chiudi</button>
+            `;
+            
+            modal.style.display = 'block';
+            console.log('✅ Modal scelta data mostrato');
+        }
+
+        function createAppointment(dateStr) {
+            logAppointment('📝 Richiesta creazione appuntamento per data:', dateStr);
+            const nome = prompt('👤 Nome cliente:');
+            if (nome && nome.trim()) {
+                console.log('👤 Nome inserito:', nome.trim());
+                addAppointment(nome.trim(), dateStr);
+                closeAppointmentModal();
+            } else {
+                console.log('⏸️ Creazione annullata - nessun nome inserito');
+            }
+        }
+
+        function showBlockHoursForm(dateStr) {
+            console.log('🚫 Mostra form blocco orari per:', dateStr);
+            const modalBody = document.getElementById('modalBody');
+            const modalButtons = document.getElementById('modalButtons');
+            
+            modalBody.innerHTML = `
+                <div style="text-align:left;">
+                    <label style="display:block; margin:10px 0 5px;"><strong>Dalle ore:</strong></label>
+                    <input type="time" id="blockStartTime" value="09:00" style="width:100%; padding:8px; border:2px solid #bdc3c7; border-radius:5px;">
+                    
+                    <label style="display:block; margin:15px 0 5px;"><strong>Alle ore:</strong></label>
+                    <input type="time" id="blockEndTime" value="17:00" style="width:100%; padding:8px; border:2px solid #bdc3c7; border-radius:5px;">
+                    
+                    <label style="display:block; margin:15px 0 5px;"><strong>Motivo (opzionale):</strong></label>
+                    <input type="text" id="blockReason" placeholder="Es: Chiusura straordinaria" style="width:100%; padding:8px; border:2px solid #bdc3c7; border-radius:5px;">
+                </div>
+            `;
+            
+            modalButtons.innerHTML = `
+                <button type="button" class="btn btn-confirm" onclick="confirmBlockHours('${dateStr}')">Conferma Blocco</button>
+                <button type="button" class="btn btn-close" onclick="closeAppointmentModal()">Annulla</button>
+            `;
+            console.log('✅ Form blocco orari mostrato');
+        }
+
+        function confirmBlockHours(dateStr) {
+            const startTime = document.getElementById('blockStartTime').value;
+            const endTime = document.getElementById('blockEndTime').value;
+            const reason = document.getElementById('blockReason').value || 'Orario bloccato';
+            
+            console.log('🚫 Conferma blocco orari - Da:', startTime, 'A:', endTime, 'Motivo:', reason);
+            
+            if (!startTime || !endTime) {
+                console.log('⚠️ Orari mancanti');
+                alert('⚠️ Inserisci orario inizio e fine');
+                return;
+            }
+            
+            if (startTime >= endTime) {
+                console.log('⚠️ Orario fine precedente a inizio');
+                alert('⚠️ L\'orario di fine deve essere dopo l\'inizio');
+                return;
+            }
+            
+            blockTimeRange(dateStr, startTime, endTime, reason);
+        }
+
+        function blockTimeRange(dateStr, startTime, endTime, reason) {
+            console.log('🚫 Blocco range orari - Data:', dateStr, 'Da:', startTime, 'A:', endTime);
+            const start = parseInt(startTime.replace(':', ''));
+            const end = parseInt(endTime.replace(':', ''));
+            
+            let currentTime = start;
+            let blockedCount = 0;
+            
+            while (currentTime < end) {
+                const hours = Math.floor(currentTime / 100);
+                const minutes = currentTime % 100;
+                const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+                
+                console.log('🚫 Blocco slot:', timeStr);
+                
+                fetch(API_URL, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        customer_name: '🚫 ' + reason,
+                        appointment_date: dateStr,
+                        appointment_time: timeStr,
+                        status: 'blocked',
+                        source: 'admin_block',
+                        timestamp: new Date().toISOString()
+                    })
+                })
+                .then(response => {
+                    console.log('📡 Risposta blocco slot', timeStr, ':', response.status);
+                    return response.json();
+                })
+                .then(result => {
+                    console.log('📋 Risultato blocco:', result);
+                    if (result.status === 'saved') {
+                        blockedCount++;
+                        console.log('✅ Slot bloccato:', timeStr);
+                    }
+                })
+                .catch(error => {
+                    console.error('💥 Errore blocco slot', timeStr, ':', error);
+                });
+                
+                minutes += 30;
+                if (minutes >= 60) {
+                    currentTime = (hours + 1) * 100;
+                } else {
+                    currentTime = hours * 100 + minutes;
+                }
+            }
+            console.log('📊 Totale slot da bloccare:', blockedCount);
+            updateStatus(`✅ ${blockedCount} orari bloccati`);
+            closeAppointmentModal();
+            setTimeout(loadCalendar, 500);
+        }
+        
+        console.log('✅ Script caricato completamente');
+    </script>
+</body>
+</html>
+
+
+
+
